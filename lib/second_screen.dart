@@ -105,13 +105,77 @@ class _MyHomePageState extends State<MyHomePage> {
               isLoading = true;
             });
           },
-          onPageFinished: (String url) {
+          onPageFinished: (String url) async {
             if (!hasError) {
               setState(() {
                 isLoading = false;
                 loadingProgress = 1.0;
                 isRetrying = false;
               });
+
+              // Inject JavaScript to automatically convert PDF object/embed/iframe tags to Google Docs Viewer
+              try {
+                await _controller.runJavaScript('''
+                  (function() {
+                    function convertPDFs() {
+                      // 1. Target <object> tags pointing to PDFs or S3 documents
+                      var objects = document.querySelectorAll('object[type="application/pdf"], object[data*=".pdf"], object[data*="amazonaws.com"]');
+                      objects.forEach(function(obj) {
+                        var pdfUrl = obj.getAttribute('data');
+                        if (pdfUrl && !pdfUrl.includes('docs.google.com')) {
+                          console.log('TECO_PDF: Converting object tag to iframe. URL:', pdfUrl);
+                          var iframe = document.createElement('iframe');
+                          iframe.src = 'https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(pdfUrl);
+                          iframe.style.width = '100%';
+                          iframe.style.height = '100%';
+                          iframe.style.border = 'none';
+                          iframe.className = obj.className;
+                          if (obj.id) iframe.id = obj.id;
+                          obj.parentNode.replaceChild(iframe, obj);
+                        }
+                      });
+
+                      // 2. Target <embed> tags pointing to PDFs or S3 documents
+                      var embeds = document.querySelectorAll('embed[type="application/pdf"], embed[src*=".pdf"], embed[src*="amazonaws.com"]');
+                      embeds.forEach(function(emb) {
+                        var pdfUrl = emb.getAttribute('src');
+                        if (pdfUrl && !pdfUrl.includes('docs.google.com')) {
+                          console.log('TECO_PDF: Converting embed tag to iframe. URL:', pdfUrl);
+                          var iframe = document.createElement('iframe');
+                          iframe.src = 'https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(pdfUrl);
+                          iframe.style.width = '100%';
+                          iframe.style.height = '100%';
+                          iframe.style.border = 'none';
+                          iframe.className = emb.className;
+                          if (emb.id) iframe.id = emb.id;
+                          emb.parentNode.replaceChild(iframe, emb);
+                        }
+                      });
+
+                      // 3. Target <iframe> tags pointing directly to PDFs or S3 documents
+                      var iframes = document.querySelectorAll('iframe');
+                      iframes.forEach(function(ifr) {
+                        var src = ifr.getAttribute('src');
+                        if (src && (src.toLowerCase().includes('.pdf') || src.includes('amazonaws.com')) && !src.includes('docs.google.com')) {
+                          console.log('TECO_PDF: Converting iframe source. URL:', src);
+                          ifr.src = 'https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(src);
+                        }
+                      });
+                    }
+
+                    // Run immediately
+                    convertPDFs();
+
+                    // Run periodically to catch dynamic updates in SPAs
+                    if (!window.tecoPdfIntervalRegistered) {
+                      window.tecoPdfIntervalRegistered = true;
+                      setInterval(convertPDFs, 1000);
+                    }
+                  })();
+                ''');
+              } catch (e) {
+                // Ignore JavaScript execution errors during load transition
+              }
             }
           },
           onWebResourceError: (WebResourceError error) {
