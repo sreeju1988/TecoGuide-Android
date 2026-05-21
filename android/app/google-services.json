@@ -1,0 +1,118 @@
+{
+  "project_info": {
+    "project_number": "658942158354",
+    "project_id": "teco-flutter",
+    "storage_bucket": "teco-flutter.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:658942158354:android:3ee4aebe5c83674e0cdacb",
+        "android_client_info": {
+          "package_name": "com.example.teco_web_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "658942158354-prv0rvt5n7an8blmr7lk8jl4099v8b3d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVuKjjI26m2VXrup4x3PxHlP7EeC8mo1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "658942158354-prv0rvt5n7an8blmr7lk8jl4099v8b3d.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "658942158354-9ov70jh9c87p8v25d0s9f9uqr2ea9gkh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tecotalk.tecoapp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:658942158354:android:bf50502117f5d7980cdacb",
+        "android_client_info": {
+          "package_name": "com.tecotalk.tecoapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "658942158354-prv0rvt5n7an8blmr7lk8jl4099v8b3d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVuKjjI26m2VXrup4x3PxHlP7EeC8mo1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "658942158354-prv0rvt5n7an8blmr7lk8jl4099v8b3d.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "658942158354-9ov70jh9c87p8v25d0s9f9uqr2ea9gkh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tecotalk.tecoapp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:658942158354:android:afb7b150154b0c7d0cdacb",
+        "android_client_info": {
+          "package_name": "com.tecotalk.tecoapp.tecoapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "658942158354-prv0rvt5n7an8blmr7lk8jl4099v8b3d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVuKjjI26m2VXrup4x3PxHlP7EeC8mo1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "658942158354-prv0rvt5n7an8blmr7lk8jl4099v8b3d.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "658942158354-9ov70jh9c87p8v25d0s9f9uqr2ea9gkh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tecotalk.tecoapp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
