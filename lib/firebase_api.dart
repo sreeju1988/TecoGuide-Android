@@ -7,7 +7,9 @@ import 'firebase_options.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // If you're going to use other Firebase services in the background, such as Firestore,
   // make sure you call `initializeApp` before using other Firebase services.
-  //await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   print("Handling a background message: ${message.messageId}");
 }
@@ -17,7 +19,7 @@ class FirebaseAPI {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    reqestNotificationPermission();
+    await requestNotificationPermission();
     await FirebaseMessaging.instance.setAutoInitEnabled(true);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -30,7 +32,7 @@ class FirebaseAPI {
     });
   }
 
-  Future<void> reqestNotificationPermission() async {
+  Future<void> requestNotificationPermission() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
     NotificationSettings settings = await messaging.requestPermission(
@@ -48,6 +50,9 @@ class FirebaseAPI {
 
   Future<String?> getToken() async {
     String? token = await FirebaseMessaging.instance.getToken();
+    print("==================================================================");
+    print("FCM DEVICE TOKEN: $token");
+    print("==================================================================");
     return token;
   }
 }
