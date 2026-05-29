@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'dart:io';
 import 'firebase_api.dart';
 import 'second_screen.dart';
 
@@ -50,9 +52,14 @@ class StartState extends State<SplashScreen> {
               height: 150,
             ),
             const SizedBox(height: 24),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-            ),
+            Platform.isIOS
+                ? const CupertinoActivityIndicator(
+                    color: Colors.blue,
+                    radius: 15,
+                  )
+                : const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
           ],
         ),
       ),

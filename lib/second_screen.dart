@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -46,6 +47,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String errorMessage = '';
   bool isRetrying = false;
   bool showDebugInfo = false;
+  bool _canPop = false;
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
   late final WebViewController _controller;
 
@@ -94,10 +96,13 @@ class _MyHomePageState extends State<MyHomePage> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            setState(() {
-              loadingProgress = progress / 100;
-              isLoading = progress < 100;
-            });
+            if (mounted) {
+              setState(() {
+                loadingProgress = progress / 100;
+                isLoading = progress < 100;
+              });
+            }
+            _updateCanPop();
           },
           onPageStarted: (String url) {
             setState(() {
@@ -106,6 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
             });
           },
           onPageFinished: (String url) async {
+            _updateCanPop();
             if (!hasError) {
               setState(() {
                 isLoading = false;
@@ -191,6 +197,14 @@ class _MyHomePageState extends State<MyHomePage> {
           onNavigationRequest: (NavigationRequest request) {
             final fUrl = Uri.parse(request.url);
             
+            // Intercept PDF links to open them in the external browser (Safari on iOS).
+            // Safari handles PDF viewing and downloading natively.
+            if (fUrl.path.toLowerCase().endsWith('.pdf') || 
+                request.url.toLowerCase().contains('.pdf?')) {
+              _launchInBrowser(fUrl);
+              return NavigationDecision.prevent;
+            }
+
             bool isInternal = AppConstants.internalDomains.any(
               (domain) => request.url.contains(domain)
             );
@@ -241,23 +255,44 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
     // #enddocregion platform_features
-
+    
     _controller = controller;
   }
 
   String _getWebUrl() {
-    String webUrl = "${AppConstants.webUrl}?device_type=mobile&firebaseToken=";
-    if (widget.firebase.isNotEmpty) {
-      webUrl = "${AppConstants.webUrl}?device_type=mobile&firebaseToken=${widget.firebase}";
-    }
+    String platform = Platform.isIOS ? 'ios' : 'android';
+    
+    final baseUri = Uri.parse(AppConstants.webUrl);
+    final finalUri = baseUri.replace(
+      queryParameters: {
+        ...baseUri.queryParameters,
+        'device_type': 'mobile',
+        'platform': platform,
+        'firebaseToken': widget.firebase,
+      },
+    );
+    
+    String webUrl = finalUri.toString();
+    print('TECO_DEBUG: Generated URL: $webUrl');
     return webUrl;
   }
 
   Future<void> _checkConnectivity() async {
     final results = await Connectivity().checkConnectivity();
-    setState(() {
-      isOffline = results.contains(ConnectivityResult.none);
-    });
+    final bool currentlyOffline = results.contains(ConnectivityResult.none) || 
+                                (results.length == 1 && results.first == ConnectivityResult.none);
+    
+    // If we were offline and now we are online, trigger an automatic reload
+    if (isOffline && !currentlyOffline) {
+      debugPrint('TECO_DEBUG: Internet restored, auto-reloading...');
+      _handleRetry();
+    }
+
+    if (mounted) {
+      setState(() {
+        isOffline = currentlyOffline;
+      });
+    }
   }
 
   Future<void> _handleReload() async {
@@ -398,11 +433,12 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
+      canPop: _canPop,
+      onPopInvoked: (didPop) async {
         if (didPop) return;
         if (await _controller.canGoBack()) {
           _controller.goBack();
+          _updateCanPop();
         }
       },
       child: Scaffold(
@@ -431,11 +467,16 @@ class _MyHomePageState extends State<MyHomePage> {
                               const SizedBox(height: 24),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 48),
-                                child: LinearProgressIndicator(
-                                  value: loadingProgress,
-                                  backgroundColor: Colors.grey[200],
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                                ),
+                                child: Platform.isIOS
+                                    ? const CupertinoActivityIndicator(
+                                        color: Colors.blue,
+                                        radius: 12,
+                                      )
+                                    : LinearProgressIndicator(
+                                        value: loadingProgress,
+                                        backgroundColor: Colors.grey[200],
+                                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                                      ),
                               ),
                             ],
                           ),
@@ -648,13 +689,15 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     child: isRetrying
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
+                            child: Platform.isIOS
+                                ? const CupertinoActivityIndicator(color: Colors.white)
+                                : const CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
                           )
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -692,5 +735,14 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _updateCanPop() async {
+    bool canGoBack = await _controller.canGoBack();
+    if (mounted && _canPop != !canGoBack) {
+      setState(() {
+        _canPop = !canGoBack;
+      });
+    }
   }
 }

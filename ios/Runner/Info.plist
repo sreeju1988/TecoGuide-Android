@@ -52,5 +52,17 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
     <false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TecoGuide needs access to your photo library to allow you to upload documents and images.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>TecoGuide needs access to your camera to allow you to take photos of documents for upload.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TecoGuide needs access to your microphone for recording videos if required during document upload.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

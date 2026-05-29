@@ -1,4 +1,4 @@
-package com.tecotalk.tecoapp
+package com.tecotalk.tecoapp.test
 
 import io.flutter.embedding.android.FlutterActivity
 

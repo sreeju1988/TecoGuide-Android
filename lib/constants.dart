@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appTitle = 'Teco Guide';
-  static const String webUrl = 'https://app.tecoguide.com/login';
+  static const String webUrl = 'https://stage.tecoguide.com/login';
   static const String userAgent = 'Chrome/56.0.0.0 Mobile';
   
   // URL Filtering
@@ -8,6 +8,7 @@ class AppConstants {
     'tecoguide.com',
     'accounts.google.com',
     'app.customgpt.ai',
+    'openai.com',
   ];
 
   static const List<String> allowedExtensions = [
