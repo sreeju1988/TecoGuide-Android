@@ -11,7 +11,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  print("Handling a background message: ${message.messageId}");
+  // Background message handler - no logging in production
 }
 
 class FirebaseAPI {
@@ -23,19 +23,14 @@ class FirebaseAPI {
     await FirebaseMessaging.instance.setAutoInitEnabled(true);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
-
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-      }
+      // Message received in foreground
     });
   }
 
   Future<void> requestNotificationPermission() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-    NotificationSettings settings = await messaging.requestPermission(
+    await messaging.requestPermission(
       alert: true,
       announcement: false,
       badge: true,
@@ -44,15 +39,10 @@ class FirebaseAPI {
       provisional: false,
       sound: true,
     );
-
-    print('User granted permission: ${settings.authorizationStatus}');
   }
 
   Future<String?> getToken() async {
     String? token = await FirebaseMessaging.instance.getToken();
-    print("==================================================================");
-    print("FCM DEVICE TOKEN: $token");
-    print("==================================================================");
     return token;
   }
 }

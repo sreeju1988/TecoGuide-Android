@@ -52,11 +52,39 @@ class _MyHomePageState extends State<MyHomePage> {
   late final WebViewController _controller;
 
   Future<void> _launchInBrowser(Uri url) async {
-    if (!await launchUrl(
-      url,
-      mode: LaunchMode.externalApplication,
-    )) {
-      throw Exception('Could not launch $url');
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening in external browser...'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(milliseconds: 2500),
+        ),
+      );
+    }
+    
+    // Brief delay ensures the Flutter UI thread renders the loader before
+    // the OS locks up transitioning to Safari
+    await Future.delayed(const Duration(milliseconds: 250));
+
+    try {
+      await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      // Ignore URL launch errors silently in production
+    } finally {
+      // Hold the loader slightly longer while iOS background transition finishes
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -99,7 +127,12 @@ class _MyHomePageState extends State<MyHomePage> {
             if (mounted) {
               setState(() {
                 loadingProgress = progress / 100;
-                isLoading = progress < 100;
+                // Only hide the loader when progress reaches 100.
+                // We do not set isLoading = true here, which prevents dynamic 
+                // embedded iframes (like YouTube) from popping the full screen mask.
+                if (progress == 100) {
+                  isLoading = false;
+                }
               });
             }
             _updateCanPop();
@@ -107,7 +140,8 @@ class _MyHomePageState extends State<MyHomePage> {
           onPageStarted: (String url) {
             setState(() {
               hasError = false;
-              isLoading = true;
+              // Removed isLoading = true here so that internal web navigation 
+              // is completely seamless and native to the web app.
             });
           },
           onPageFinished: (String url) async {
@@ -119,6 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 isRetrying = false;
               });
 
+
               // Inject JavaScript to automatically convert PDF object/embed/iframe tags to Google Docs Viewer
               try {
                 await _controller.runJavaScript('''
@@ -129,7 +164,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       objects.forEach(function(obj) {
                         var pdfUrl = obj.getAttribute('data');
                         if (pdfUrl && !pdfUrl.includes('docs.google.com')) {
-                          console.log('TECO_PDF: Converting object tag to iframe. URL:', pdfUrl);
                           var iframe = document.createElement('iframe');
                           iframe.src = 'https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(pdfUrl);
                           iframe.style.width = '100%';
@@ -146,7 +180,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       embeds.forEach(function(emb) {
                         var pdfUrl = emb.getAttribute('src');
                         if (pdfUrl && !pdfUrl.includes('docs.google.com')) {
-                          console.log('TECO_PDF: Converting embed tag to iframe. URL:', pdfUrl);
                           var iframe = document.createElement('iframe');
                           iframe.src = 'https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(pdfUrl);
                           iframe.style.width = '100%';
@@ -163,10 +196,34 @@ class _MyHomePageState extends State<MyHomePage> {
                       iframes.forEach(function(ifr) {
                         var src = ifr.getAttribute('src');
                         if (src && (src.toLowerCase().includes('.pdf') || src.includes('amazonaws.com')) && !src.includes('docs.google.com')) {
-                          console.log('TECO_PDF: Converting iframe source. URL:', src);
                           ifr.src = 'https://docs.google.com/gview?embedded=true&url=' + encodeURIComponent(src);
                         }
                       });
+
+                      // 4. Hook JS window.open and native download links
+                      function resolveUrl(url) {
+                        if (!url) return '';
+                        var a = document.createElement('a');
+                        a.href = url;
+                        return a.href;
+                      }
+
+                      window.originalOpen = window.open;
+                      window.open = function(url, name, specs) {
+                        var absUrl = resolveUrl(url);
+                        if (absUrl) { Toaster.postMessage('PROXY_OPEN:' + absUrl); }
+                        return null; 
+                      };
+
+                      document.addEventListener('click', function(e) {
+                        var a = e.target.closest('a');
+                        if (a && a.href) {
+                          if (a.hasAttribute('download') || a.getAttribute('target') === '_blank') {
+                            e.preventDefault();
+                            Toaster.postMessage('PROXY_OPEN:' + a.href);
+                          }
+                        }
+                      }, true);
                     }
 
                     // Run immediately
@@ -195,8 +252,14 @@ class _MyHomePageState extends State<MyHomePage> {
             }
           },
           onNavigationRequest: (NavigationRequest request) {
+            // Subframes (like YouTube or Stripe embeds) should always navigate normally within their iframes.
+            // This prevents them from triggering the external browser loader.
+            if (!request.isMainFrame) {
+              return NavigationDecision.navigate;
+            }
+
             final fUrl = Uri.parse(request.url);
-            
+
             // Intercept PDF links to open them in the external browser (Safari on iOS).
             // Safari handles PDF viewing and downloading natively.
             if (fUrl.path.toLowerCase().endsWith('.pdf') || 
@@ -222,9 +285,35 @@ class _MyHomePageState extends State<MyHomePage> {
       ..addJavaScriptChannel(
         'Toaster',
         onMessageReceived: (JavaScriptMessage message) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message.message)),
-          );
+          if (message.message.startsWith('PROXY_OPEN:')) {
+            String urlStr = message.message.substring(11);
+            
+            if (urlStr.startsWith('blob:')) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('BLOB download detected. Please report this URL to support.')),
+              );
+              debugPrint('TECO_DEBUG_BLOB: \$urlStr');
+              return;
+            }
+
+            final fUrl = Uri.parse(urlStr);
+            bool isInternal = AppConstants.internalDomains.any(
+              (domain) => urlStr.contains(domain)
+            );
+
+            if (urlStr.toLowerCase().contains('.pdf') || 
+                urlStr.toLowerCase().contains('download') || 
+                urlStr.toLowerCase().contains('amazonaws.com') ||
+                !isInternal) {
+              _launchInBrowser(fUrl);
+            } else {
+              _controller.loadRequest(fUrl);
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message.message)),
+            );
+          }
         },
       )
       ..loadRequest(Uri.parse(webUrl));
@@ -273,7 +362,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
     
     String webUrl = finalUri.toString();
-    print('TECO_DEBUG: Generated URL: $webUrl');
+    debugPrint('TECO_DEBUG: Generated URL: $webUrl');
     return webUrl;
   }
 
@@ -284,7 +373,6 @@ class _MyHomePageState extends State<MyHomePage> {
     
     // If we were offline and now we are online, trigger an automatic reload
     if (isOffline && !currentlyOffline) {
-      debugPrint('TECO_DEBUG: Internet restored, auto-reloading...');
       _handleRetry();
     }
 
@@ -327,7 +415,7 @@ class _MyHomePageState extends State<MyHomePage> {
     String statusMessage = '';
     
     try {
-      final lookupResults = await InternetAddress.lookup('stage.tecoguide.com')
+      final lookupResults = await InternetAddress.lookup('app.tecoguide.com')
           .timeout(const Duration(seconds: 3));
       if (lookupResults.isNotEmpty && lookupResults[0].rawAddress.isNotEmpty) {
         hasRealInternet = true;
@@ -342,14 +430,14 @@ class _MyHomePageState extends State<MyHomePage> {
       statusMessage = 'Connection timed out. Please try again.';
     }
 
-    // 3. Fallback: Check google.com to distinguish between overall offline vs. only staging server issues
+    // 3. Fallback: Check google.com to distinguish between overall offline vs. only app server issues
     if (!hasRealInternet) {
       try {
         final lookupResults = await InternetAddress.lookup('google.com')
             .timeout(const Duration(seconds: 3));
         if (lookupResults.isNotEmpty && lookupResults[0].rawAddress.isNotEmpty) {
           hasRealInternet = true;
-          statusMessage = 'Staging server is unreachable. Please try again later.';
+          statusMessage = 'Server is unreachable. Please try again later.';
         }
       } catch (_) {}
     }
